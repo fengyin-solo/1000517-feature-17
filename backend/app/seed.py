@@ -1,7 +1,92 @@
 """示例数据：每个模块给几条不同状态的记录，方便起服务后立刻看到内容。"""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
+
+
+def _today(offset: int = 0) -> str:
+    """报警触发时间相对今天取，保证「今日报警」统计在任何一天拉起服务都有数。"""
+    return (date.today() + timedelta(days=offset)).isoformat()
+
+
+def _alarm(
+    entry_id: int,
+    *,
+    code: str,
+    kind: str,
+    level: str,
+    worksite: str,
+    device: str,
+    when: str,
+    status: str,
+    confirmer: tuple[str, str] | None = None,
+    disposer: tuple[str, str] | None = None,
+    note: str = "—",
+    abnormal: bool = False,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "id": entry_id,
+        "status": status,
+        "pending": status == "待确认",
+        "abnormal": abnormal,
+        "报警编号": code,
+        "报警类型": kind,
+        "报警等级": level,
+        "所属工区": worksite,
+        "触发设备": device,
+        "触发时间": when,
+        "确认人员": confirmer[1] if confirmer else "—",
+        "确认人ID": confirmer[0] if confirmer else "",
+        "处置人员": disposer[1] if disposer else "—",
+        "处置人ID": disposer[0] if disposer else "",
+        "处置说明": note,
+    }
+    return row
+
+
+def _build_alarm_rows() -> list[dict[str, Any]]:
+    """监测报警样例：覆盖本/跨工区、高/中/低等级、待确认/已确认/已处置/已忽略。
+
+    已确认记录的确认人刻意与工区另一个值班错开，保证「确认与处置角色分开」后
+    每条已确认报警都有合法的处置账号；已处置记录的确认人与处置人也不同账号。
+    """
+    return [
+        _alarm(1, code="ALAR-2501", kind="信号机红灯断丝", level="中",
+               worksite="一工区", device="XHJ-A01", when=f"{_today()} 08:12",
+               status="待确认"),
+        _alarm(2, code="ALAR-2502", kind="转辙机动作电流越限", level="低",
+               worksite="二工区", device="ZZJ-B07", when=f"{_today()} 08:47",
+               status="待确认"),
+        _alarm(3, code="ALAR-2503", kind="轨道电路红光带", level="高",
+               worksite="一工区", device="GDJL-A05", when=f"{_today()} 09:03",
+               status="待确认"),
+        _alarm(4, code="ALAR-2504", kind="联锁机通信中断", level="高",
+               worksite="三工区", device="LSB-C01", when=f"{_today()} 09:25",
+               status="待确认"),
+        _alarm(5, code="ALAR-2408", kind="信号机电压波动", level="低",
+               worksite="二工区", device="XHJ-B02", when=f"{_today(-1)} 22:31",
+               status="已忽略", confirmer=None, abnormal=True,
+               note="夜间电压瞬时波动，复测正常，按误报忽略"),
+        _alarm(6, code="ALAR-2505", kind="转辙机表示缺口偏移", level="中",
+               worksite="一工区", device="ZZJ-A03", when=f"{_today()} 07:55",
+               status="已确认", confirmer=("U1001", "张值班")),
+        _alarm(7, code="ALAR-2506", kind="轨道电路分路不良", level="中",
+               worksite="二工区", device="GDJL-B02", when=f"{_today()} 06:40",
+               status="已确认", confirmer=("U1002", "李值班")),
+        _alarm(8, code="ALAR-2507", kind="ATP应答器报文异常", level="高",
+               worksite="三工区", device="ATP-C03", when=f"{_today()} 05:18",
+               status="已确认", confirmer=("U2001", "陈调度")),
+        _alarm(9, code="ALAR-2402", kind="信号机黄灯主丝断丝", level="低",
+               worksite="二工区", device="XHJ-B02", when=f"{_today(-2)} 14:06",
+               status="已处置", confirmer=("U1002", "李值班"),
+               disposer=("U1004", "周值班"), note="更换灯泡并复测，显示恢复正常"),
+        _alarm(10, code="ALAR-2405", kind="轨道电路红光带", level="高",
+               worksite="一工区", device="GDJL-A05", when=f"{_today(-1)} 19:52",
+               status="已处置", confirmer=("U2001", "陈调度"),
+               disposer=("U1005", "吴值班"), note="更换受电端引接线，红光带消除"),
+    ]
+
 
 SEED_ROWS: dict[str, list[dict[str, Any]]] = {
     "section": [{'id': 1,
@@ -508,42 +593,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
   '申请单位': '天窗作业样例3',
   '负责人': '天窗作业样例3',
   '天窗状态': '天窗作业样例3'}],
-    "alarm": [{'id': 1,
-  'status': '待确认',
-  'pending': True,
-  'abnormal': False,
-  '报警编号': 'ALAR-0001',
-  '报警类型': '监测报警样例1',
-  '报警等级': '监测报警样例1',
-  '触发设备': '监测报警样例1',
-  '触发时间': '2026-09-01',
-  '确认人员': '监测报警样例1',
-  '处置说明': '监测报警样例1',
-  '报警状态': '监测报警样例1'},
- {'id': 2,
-  'status': '已确认',
-  'pending': True,
-  'abnormal': True,
-  '报警编号': 'ALAR-0002',
-  '报警类型': '监测报警样例2',
-  '报警等级': '监测报警样例2',
-  '触发设备': '监测报警样例2',
-  '触发时间': '2026-09-02',
-  '确认人员': '监测报警样例2',
-  '处置说明': '监测报警样例2',
-  '报警状态': '监测报警样例2'},
- {'id': 3,
-  'status': '已处置',
-  'pending': False,
-  'abnormal': False,
-  '报警编号': 'ALAR-0003',
-  '报警类型': '监测报警样例3',
-  '报警等级': '监测报警样例3',
-  '触发设备': '监测报警样例3',
-  '触发时间': '2026-09-03',
-  '确认人员': '监测报警样例3',
-  '处置说明': '监测报警样例3',
-  '报警状态': '监测报警样例3'}],
+    "alarm": _build_alarm_rows(),
     "verify": [{'id': 1,
   'status': '待验收',
   'pending': True,
